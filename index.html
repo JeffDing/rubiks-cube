@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>三维魔方 · Rubik's Cube</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #eef2f8;
+    background: radial-gradient(1200px 800px at 70% 20%, #242a55 0%, #141834 45%, #070a17 100%);
+  }
+  #stage { position: fixed; inset: 0; }
+  .panel {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  }
+  #hud {
+    top: 14px; padding: 10px 16px; display: flex; align-items: center; gap: 18px;
+    max-width: calc(100vw - 24px);
+  }
+  #hud h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; white-space: nowrap; }
+  #hud h1 span { background: linear-gradient(90deg,#7ee0ff,#a48bff,#ff8fd0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stats { display: flex; align-items: center; gap: 14px; }
+  .stat { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+  .stat b { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .stat i { font-size: 11px; font-style: normal; opacity: 0.7; }
+  .flag { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.12); white-space: nowrap; }
+  .flag.ok { background: rgba(46,204,113,0.25); color: #7bffb0; }
+  #controls {
+    bottom: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;
+    width: min(560px, calc(100vw - 24px));
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  button {
+    font-family: inherit; color: #eef2f8; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.10);
+    border-radius: 12px; padding: 9px 14px; font-size: 14px; font-weight: 600;
+    transition: transform .08s ease, background .15s ease, box-shadow .15s ease;
+  }
+  button:hover { background: rgba(255,255,255,0.18); }
+  button:active { transform: translateY(1px) scale(0.98); }
+  .primary { background: linear-gradient(135deg,#5b7cfa,#8b5cf6); border-color: transparent; box-shadow: 0 6px 18px rgba(91,124,250,0.35); }
+  .primary:hover { box-shadow: 0 8px 22px rgba(139,92,246,0.45); }
+  .face-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 52px; padding: 7px 8px; }
+  .face-btn b { font-size: 16px; }
+  .face-btn i { font-size: 10px; font-style: normal; opacity: 0.75; }
+  .hint { text-align: center; font-size: 12px; opacity: 0.72; line-height: 1.5; }
+  .hint kbd { background: rgba(255,255,255,0.15); border-radius: 5px; padding: 1px 6px; font-size: 11px; }
+  #note {
+    position: fixed; top: 76px; left: 50%; transform: translateX(-50%) translateY(-8px);
+    background: rgba(20,24,45,0.85); border: 1px solid rgba(255,255,255,0.18);
+    padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600;
+    opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease;
+    max-width: calc(100vw - 32px); text-align: center;
+  }
+  #note.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @media (max-width: 420px) {
+    #hud h1 { display: none; }
+    .stat b { font-size: 16px; }
+    .face-btn { min-width: 46px; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <div id="hud" class="panel">
+    <h1>🧊 <span>三维魔方</span></h1>
+    <div class="stats">
+      <div class="stat"><b id="steps">0</b><i>步数</i></div>
+      <div class="stat"><b id="timer">00:00.00</b><i>计时</i></div>
+      <div id="flag" class="flag">就绪</div>
+    </div>
+  </div>
+
+  <div id="controls" class="panel">
+    <div class="row" id="faces"></div>
+    <div class="row">
+      <button id="btn-shuffle" class="primary">打乱</button>
+      <button id="btn-solve">智能还原</button>
+      <button id="btn-reset">瞬间复原</button>
+      <button id="btn-view">重置视角</button>
+    </div>
+    <div class="hint">
+      拖动贴纸转层 · 拖动空白转视角 · 右键/双指拖动移动魔方 · 滚轮/双指缩放<br />
+      也可用键盘 <kbd>U</kbd><kbd>D</kbd><kbd>L</kbd><kbd>R</kbd><kbd>F</kbd><kbd>B</kbd> 转面（按 <kbd>Shift</kbd> 反向）
+    </div>
+  </div>
+
+  <div id="note"></div>
+
+  <script src="js/three.min.js"></script>
+  <script src="js/cube.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
